@@ -16,14 +16,15 @@ A Python FastAPI backend that accepts a public website URL, safely extracts and 
 8. [Installation](#installation)
 9. [Environment Configuration](#environment-configuration)
 10. [Running the Application](#running-the-application)
-11. [API Documentation](#api-documentation)
-12. [API Error Handling](#api-error-handling)
-13. [Security](#security)
-14. [Testing](#testing)
-15. [LLM Pricing](#llm-pricing)
-16. [Limitations](#limitations)
-17. [Future Improvements](#future-improvements)
-18. [License](#license)
+11. [Frontend Setup](#frontend-setup)
+12. [API Documentation](#api-documentation)
+13. [API Error Handling](#api-error-handling)
+14. [Security](#security)
+15. [Testing](#testing)
+16. [LLM Pricing](#llm-pricing)
+17. [Limitations](#limitations)
+18. [Future Improvements](#future-improvements)
+19. [License](#license)
 
 ---
 
@@ -52,7 +53,7 @@ The **AI-Powered Website Link Analysis API** automates structured website resear
 - **Fact vs. Inference Separation:** Distinguishes website-identified evidence (`website_identified`) from AI-inferred recommendations (`ai_inferred` / `ai_suggested`) and separates observable SEO issues from technical audit recommendations.
 - **Resilient Error & Retry Handling:** Bounded exponential backoff with jitter and `Retry-After` support for transient Gemini failures only, plus consistent, secret-safe JSON error envelopes (`ErrorResponse`).
 - **Prompt-Injection Mitigation:** Isolates untrusted webpage content inside neutralized `<UNTRUSTED_WEBSITE_DATA>` delimiters, prunes hidden HTML elements, and runs Gemini with zero tools enabled.
-- **Automated Offline Test Suite:** 347 deterministic offline tests covering validation, SSRF, extraction, schemas, prompt building, Gemini error/retry handling, configuration, and API integration.
+- **Automated Offline Test Suites:** 348 backend and 24 frontend deterministic offline tests covering validation, SSRF, extraction, schemas, prompt building, Gemini error/retry handling, configuration, CORS, API integration, cancellation, results rendering, and JSON/Markdown exports.
 
 ---
 
@@ -148,6 +149,22 @@ ai-website-link-analysis/
 │   ├── test_security_edge_cases.py
 │   ├── test_validators.py
 │   └── test_website_extractor.py
+├── frontend/
+│   ├── .env.example
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── analysis/
+│   │   │   ├── layout/
+│   │   │   ├── results/
+│   │   │   └── ui/
+│   │   ├── context/
+│   │   ├── pages/
+│   │   ├── services/
+│   │   └── utils/
+│   └── tests/
 ├── .env.example
 ├── .gitignore
 ├── README.md
@@ -204,6 +221,7 @@ REQUEST_TIMEOUT=15
 MAX_CONTENT_LENGTH=15000
 MAX_RESPONSE_BYTES=2097152
 USER_AGENT=AIWebsiteLinkAnalysisBot/1.0
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 
 LLM_PROVIDER=gemini
 GEMINI_MODEL=gemini-3.5-flash-lite
@@ -227,6 +245,7 @@ LLM_MAX_OUTPUT_TOKENS=4096
 | `MAX_CONTENT_LENGTH` | No | `15000` | Maximum cleaned text characters extracted for the LLM (`> 0`). |
 | `MAX_RESPONSE_BYTES` | No | `2097152` | Maximum raw HTTP response download size in bytes (`2 MB`, `> 0`). |
 | `USER_AGENT` | No | `AIWebsiteLinkAnalysisBot/1.0` | Honest `User-Agent` header sent during website fetching. |
+| `CORS_ORIGINS` | No | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated frontend origins allowed by FastAPI CORS middleware. |
 | `LLM_PROVIDER` | No | `gemini` | Configured LLM provider identifier. |
 | `GEMINI_MODEL` | No | `gemini-3.5-flash-lite` | Active Gemini model ID (takes precedence over `LLM_MODEL`; never switched silently at runtime). |
 | `LLM_MODEL` | No | *(empty)* | Optional legacy fallback used only when `GEMINI_MODEL` is unset. |
@@ -254,6 +273,50 @@ Local URLs:
 - **Health Check:** http://localhost:4000/health
 - **Interactive Swagger UI:** http://localhost:4000/docs
 - **OpenAPI Schema:** http://localhost:4000/openapi.json
+
+---
+
+## Frontend Setup
+
+The **SiteLens AI** React + Vite + Tailwind CSS frontend lives in `frontend/` and connects to the FastAPI backend (`POST /link-analysis`). It provides URL validation, request cancellation and retry handling, a structured five-section analysis dashboard, clipboard copy helpers, and client-side JSON and Markdown report export.
+
+> **Note:** The FastAPI backend must be running separately (for example on `http://localhost:4000`) when submitting live URLs from the frontend.
+
+### Install dependencies
+
+```bash
+cd frontend
+npm install
+```
+
+### Environment
+
+Create `frontend/.env` from `frontend/.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Configure `frontend/.env`:
+
+```env
+VITE_API_BASE_URL=http://localhost:4000
+```
+
+### Run frontend
+
+```bash
+npm run dev
+```
+
+Open **http://localhost:5173** in your browser.
+
+### Build & test frontend
+
+```bash
+npm test
+npm run build
+```
 
 ---
 
@@ -489,15 +552,25 @@ Raw exception tracebacks, API credentials, full prompts, and extracted webpage c
 
 ## Testing
 
-Run the full offline test suite:
+Run the full offline backend test suite:
 
 ```bash
 ./venv/bin/pytest -v
 ```
 
-- **Current verified status:** **347 passed, 0 failed, 0 skipped**.
-- All unit and integration tests run **100% offline** using mocked DNS resolvers, `httpx.MockTransport`, mocked Gemini clients, and FastAPI `dependency_overrides`.
-- No real websites are accessed and no real Gemini API key or live Gemini API requests are executed during the test suite.
+- **Current verified backend status:** **348 passed, 0 failed, 0 skipped**.
+
+Run the offline frontend test suite:
+
+```bash
+cd frontend
+npm test
+```
+
+- **Current verified frontend status:** **24 passed, 0 failed, 0 skipped**.
+
+- All unit and integration tests run **100% offline** using mocked DNS resolvers, `httpx.MockTransport`, mocked Gemini clients, mocked `fetch`, and FastAPI `dependency_overrides`.
+- No real websites are accessed and no real Gemini API key or live Gemini API requests are executed during the test suites.
 
 ---
 
@@ -536,7 +609,7 @@ Pricing snapshot verified against official Google documentation on **November 18
 - **Prompt injection cannot be fully eliminated:** Sanitization, delimiter isolation, hidden-DOM pruning, zero-tool execution, and Pydantic validation reduce risk significantly, but visible adversarial webpage copy can still attempt semantic manipulation.
 - **No authentication:** The API does not currently implement API keys, OAuth, or user authentication.
 - **No client-level rate limiting:** Incoming caller rate limiting is not implemented.
-- **Live Gemini smoke testing pending:** All 347 verified tests use offline mocks; live end-to-end validation with a real Gemini API key has not yet been run.
+- **Live Gemini smoke testing pending:** All 348 backend and 24 frontend verified tests use offline mocks; live end-to-end validation with a real Gemini API key has not yet been run.
 - **Synchronous DNS validation in Pydantic:** `LinkAnalysisRequest` invokes blocking `socket.getaddrinfo` during request parsing, which can block the ASGI event loop under slow or hanging DNS queries at high concurrency.
 - **Worst-case retry latency:** Per-attempt Gemini timeouts (`45s`) combined with up to `2` retries and `Retry-After` delays (capped at `30s` each) can create high tail latency during sustained provider outages.
 - **Not production-hardened as-is:** Public multi-tenant deployment requires additional hardening (network egress firewalling, authentication, rate limiting, async DNS, and observability).
