@@ -1,6 +1,8 @@
-"""Pydantic response schemas for the API."""
+"""Pydantic request and response schemas for the API."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+
+from app.utils.validators import validate_url
 
 
 class RootResponse(BaseModel):
@@ -16,3 +18,18 @@ class HealthResponse(BaseModel):
 
     status: str
 
+
+class LinkAnalysisRequest(BaseModel):
+    """Request model for submitting a website URL for analysis."""
+
+    url: str = Field(
+        ...,
+        description="Publicly accessible HTTP or HTTPS website URL to analyze.",
+        examples=["https://example.com"],
+    )
+
+    @field_validator("url")
+    @classmethod
+    def validate_website_url(cls, value: str) -> str:
+        """Validate, SSRF-check, and normalize the submitted website URL."""
+        return validate_url(value)
