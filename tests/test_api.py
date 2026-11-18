@@ -37,5 +37,6 @@ def test_openapi_schema_metadata_and_routes():
     assert data["info"]["version"] == "1.0.0"
     assert "/" in data["paths"]
     assert "/health" in data["paths"]
-    assert "/link-analysis" not in data["paths"]
+    assert "/link-analysis" in data["paths"]
+    assert "post" in data["paths"]["/link-analysis"]
 

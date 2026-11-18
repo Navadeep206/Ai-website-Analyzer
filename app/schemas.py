@@ -701,3 +701,23 @@ class LinkAnalysisResponse(BaseModel):
     @classmethod
     def validate_website_not_empty(cls, value: str) -> str:
         return _strip_non_empty(value)
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 — Consistent API Error Response Schemas
+# ---------------------------------------------------------------------------
+
+
+class ErrorDetail(BaseModel):
+    """Structured machine-readable error details safe for API clients."""
+
+    code: str = Field(..., min_length=1, description="Stable machine-readable error code.")
+    message: str = Field(..., min_length=1, description="Human-readable safe error message.")
+
+
+class ErrorResponse(BaseModel):
+    """Consistent JSON error envelope returned for failed API requests."""
+
+    success: bool = Field(default=False, description="Always false for error responses.")
+    error: ErrorDetail
+
