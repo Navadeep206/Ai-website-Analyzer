@@ -11,6 +11,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_CORS_ORIGINS: list[str] = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+
+def _get_list_env(key: str, default: list[str]) -> list[str]:
+    """Return a comma-separated list of non-empty strings from an environment variable."""
+    value = os.getenv(key)
+    if value is None or value.strip() == "":
+        return list(default)
+    items = [item.strip() for item in value.split(",") if item.strip()]
+    return items if items else list(default)
 
 
 def _get_str_env(key: str, default: str) -> str:
@@ -72,9 +85,8 @@ class Settings(BaseModel):
     max_content_length: int = Field(default=15000, gt=0)
     max_response_bytes: int = Field(default=2_097_152, gt=0)
     user_agent: str = Field(default="AIWebsiteLinkAnalysisBot/1.0", min_length=1)
+    cors_origins: list[str] = Field(default_factory=lambda: list(DEFAULT_CORS_ORIGINS))
 
-    llm_provider: str = Field(default="gemini", min_length=1)
-    llm_model: str = ""
     gemini_api_key: str = ""
     gemini_model: str = Field(default=DEFAULT_GEMINI_MODEL, min_length=1)
     llm_timeout_seconds: float = Field(default=45.0, gt=0)
@@ -100,8 +112,7 @@ def load_settings() -> Settings:
         max_content_length=_get_int_env("MAX_CONTENT_LENGTH", 15000),
         max_response_bytes=_get_int_env("MAX_RESPONSE_BYTES", 2_097_152),
         user_agent=_get_str_env("USER_AGENT", "AIWebsiteLinkAnalysisBot/1.0"),
-        llm_provider=_get_str_env("LLM_PROVIDER", "gemini"),
-        llm_model=os.getenv("LLM_MODEL", "").strip(),
+        cors_origins=_get_list_env("CORS_ORIGINS", DEFAULT_CORS_ORIGINS),
         gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip(),
         gemini_model=_resolve_gemini_model(),
         llm_timeout_seconds=_get_float_env("LLM_TIMEOUT_SECONDS", 45.0),

@@ -171,3 +171,25 @@ class TestAPIContractAndEdgeCases:
         ):
             assert expected_model in component_schemas
 
+    def test_cors_allows_configured_frontend_origin_only(self, client: TestClient):
+        allowed = client.options(
+            "/link-analysis",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+        assert allowed.status_code == 200
+        assert allowed.headers.get("access-control-allow-origin") == "http://localhost:5173"
+        assert allowed.headers.get("access-control-allow-credentials") is None
+
+        disallowed = client.options(
+            "/link-analysis",
+            headers={
+                "Origin": "https://evil.example",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+        assert disallowed.headers.get("access-control-allow-origin") is None
+

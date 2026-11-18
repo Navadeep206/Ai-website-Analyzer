@@ -6,6 +6,7 @@ import logging
 
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
@@ -55,6 +56,14 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description=settings.app_description,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Accept"],
 )
 
 
@@ -247,25 +256,39 @@ async def request_validation_exception_handler(
     )
 
 
+def _handle_api_exception(path: str, exc: Exception) -> JSONResponse:
+    """Map an exception to a safe ErrorResponse JSON payload and log cleanly."""
+    http_status, error_code, safe_message = _map_exception_to_http_error(exc)
+    if http_status >= 500:
+        logger.error(
+            "Request failed path=%s status=%d code=%s error_category=%s",
+            path,
+            http_status,
+            error_code,
+            type(exc).__name__,
+        )
+    else:
+        logger.warning(
+            "Request rejected path=%s status=%d code=%s error_category=%s",
+            path,
+            http_status,
+            error_code,
+            type(exc).__name__,
+        )
+    return _build_error_response(
+        status_code=http_status,
+        code=error_code,
+        message=safe_message,
+    )
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(
     request: Request,
     exc: Exception,
 ) -> JSONResponse:
     """Catch unhandled exceptions (including dependency errors) safely."""
-    http_status, error_code, safe_message = _map_exception_to_http_error(exc)
-    logger.error(
-        "Unhandled exception path=%s status=%d code=%s error_category=%s",
-        request.url.path,
-        http_status,
-        error_code,
-        type(exc).__name__,
-    )
-    return _build_error_response(
-        status_code=http_status,
-        code=error_code,
-        message=safe_message,
-    )
+    return _handle_api_exception(request.url.path, exc)
 
 
 # ---------------------------------------------------------------------------
@@ -333,23 +356,4 @@ async def link_analysis(
     try:
         return await analysis_service.analyze_url(payload.url)
     except Exception as exc:
-        http_status, error_code, safe_message = _map_exception_to_http_error(exc)
-        if http_status >= 500:
-            logger.error(
-                "Link analysis failed status=%d code=%s error_category=%s",
-                http_status,
-                error_code,
-                type(exc).__name__,
-            )
-        else:
-            logger.warning(
-                "Link analysis rejected status=%d code=%s error_category=%s",
-                http_status,
-                error_code,
-                type(exc).__name__,
-            )
-        return _build_error_response(
-            status_code=http_status,
-            code=error_code,
-            message=safe_message,
-        )
+        return _handle_api_exception("/link-analysis", exc)
