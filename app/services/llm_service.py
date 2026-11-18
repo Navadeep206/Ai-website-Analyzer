@@ -29,7 +29,6 @@ import logging
 import random
 import time
 from typing import Any
-from urllib.parse import urlsplit
 
 from google import genai
 from google.genai import errors as genai_errors
@@ -40,6 +39,7 @@ from pydantic import BaseModel, ValidationError
 from app.config import settings
 from app.prompts.analysis_prompt import SYSTEM_INSTRUCTION, build_analysis_prompt
 from app.schemas import LLMAnalysisPayload, WebsiteExtractedData
+from app.utils.validators import sanitize_url_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -165,17 +165,6 @@ _RETRYABLE_ERRORS: tuple[type[LLMServiceError], ...] = (
 # ---------------------------------------------------------------------------
 # Safe Logging & Header Helpers
 # ---------------------------------------------------------------------------
-
-
-def _extract_safe_host(url: str) -> str:
-    """Return only scheme and hostname for logs, omitting paths and query params."""
-    try:
-        parsed = urlsplit(url)
-        if parsed.scheme and parsed.hostname:
-            return f"{parsed.scheme}://{parsed.hostname}"
-    except ValueError:
-        pass
-    return "<redacted-url>"
 
 
 def _enum_name(value: Any) -> str | None:
@@ -494,7 +483,7 @@ class GeminiLLMService:
         """
         self._validate_configuration()
 
-        safe_target = _extract_safe_host(website_data.final_url)
+        safe_target = sanitize_url_for_log(website_data.final_url)
         prompt = build_analysis_prompt(website_data)
         config = self._build_generation_config()
 
@@ -621,23 +610,4 @@ class GeminiLLMService:
 
         # Unreachable safeguard for static type checkers
         raise LLMProviderError("Unexpected termination of LLM analysis workflow.")
-
-
-async def analyze_website(
-    website_data: WebsiteExtractedData,
-    *,
-    service: GeminiLLMService | None = None,
-) -> LLMAnalysisPayload:
-    """Analyze extracted website data with Gemini and return a validated payload.
-
-    Args:
-        website_data: Structured content extracted in Phase 3.
-        service: Optional preconfigured :class:`GeminiLLMService` instance
-            (useful for dependency injection and testing).
-
-    Returns:
-        Validated :class:`LLMAnalysisPayload`.
-    """
-    active_service = service or GeminiLLMService()
-    return await active_service.analyze_website(website_data)
 

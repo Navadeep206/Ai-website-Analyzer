@@ -68,13 +68,6 @@ class ExtractedLink(BaseModel):
     is_internal: bool
 
 
-class ExtractedImage(BaseModel):
-    """Extracted metadata for a webpage image without downloading image bytes."""
-
-    alt: str
-    url: str | None = None
-
-
 class WebsiteExtractedData(BaseModel):
     """Structured website content extracted for downstream analysis."""
 
@@ -92,7 +85,6 @@ class WebsiteExtractedData(BaseModel):
     internal_links: list[ExtractedLink] = Field(default_factory=list)
     external_links: list[ExtractedLink] = Field(default_factory=list)
     image_alt_texts: list[str] = Field(default_factory=list)
-    images: list[ExtractedImage] = Field(default_factory=list)
     content_length: int = 0
 
 

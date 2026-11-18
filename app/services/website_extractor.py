@@ -54,11 +54,12 @@ import httpx
 from bs4 import BeautifulSoup, Tag
 
 from app.config import settings
-from app.schemas import ExtractedImage, ExtractedLink, WebsiteExtractedData
+from app.schemas import ExtractedLink, WebsiteExtractedData
 from app.utils.validators import (
     MAX_REDIRECTS,
     URLValidationError,
     resolve_hostname_ips,
+    sanitize_url_for_log,
     validate_ip_address,
     validate_redirect_url,
     validate_url,
@@ -166,15 +167,7 @@ class UnsafeRedirectError(WebsiteExtractionError):
 
 def _sanitize_url_for_log(url: str) -> str:
     """Return a safe URL representation for logs (no credentials, query, or fragment)."""
-    try:
-        parsed = urlsplit(url)
-        host = parsed.hostname or ""
-        if ":" in host:
-            host = f"[{host}]"
-        netloc = f"{host}:{parsed.port}" if parsed.port else host
-        return urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))
-    except ValueError:
-        return "<invalid-url>"
+    return sanitize_url_for_log(url, include_path=True)
 
 
 # ---------------------------------------------------------------------------
@@ -817,13 +810,9 @@ def _extract_links(
     return internal_links, external_links
 
 
-def _extract_images(
-    soup: BeautifulSoup,
-    final_url: str,
-) -> tuple[list[str], list[ExtractedImage]]:
-    """Extract limited image alt texts and URLs without downloading any images."""
+def _extract_image_alt_texts(soup: BeautifulSoup) -> list[str]:
+    """Extract limited, deduplicated image alt texts without downloading any images."""
     alt_texts: list[str] = []
-    images: list[ExtractedImage] = []
     seen_alts: set[str] = set()
 
     for img in soup.find_all("img"):
@@ -839,22 +828,11 @@ def _extract_images(
             continue
         seen_alts.add(alt_key)
 
-        image_url: str | None = None
-        raw_src = img.get("src")
-        if isinstance(raw_src, str):
-            src = raw_src.strip()
-            if src and not src.lower().startswith(("data:", "blob:", "javascript:")):
-                resolved = urljoin(final_url, src)
-                if urlsplit(resolved).scheme.lower() in ("http", "https"):
-                    image_url = resolved
-
         alt_texts.append(alt_text)
-        images.append(ExtractedImage(alt=alt_text, url=image_url))
-
-        if len(images) >= MAX_IMAGES:
+        if len(alt_texts) >= MAX_IMAGES:
             break
 
-    return alt_texts, images
+    return alt_texts
 
 
 def parse_html(
@@ -894,7 +872,7 @@ def parse_html(
         tag.decompose()
 
     internal_links, external_links = _extract_links(soup, final_url)
-    image_alt_texts, images = _extract_images(soup, final_url)
+    image_alt_texts = _extract_image_alt_texts(soup)
 
     # Evaluate header/aside heuristics before removing nav/form tags inside them
     for header_tag in list(soup.find_all("header")):
@@ -941,7 +919,6 @@ def parse_html(
         internal_links=internal_links,
         external_links=external_links,
         image_alt_texts=image_alt_texts,
-        images=images,
         content_length=len(main_text),
     )
 

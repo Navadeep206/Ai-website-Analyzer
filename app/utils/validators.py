@@ -12,20 +12,18 @@ Security architecture notes
    ``169.254.169.254``) milliseconds later when the HTTP client resolves the
    hostname again to establish a TCP connection.
 
-   Therefore, the future website-fetching service (Phase 3) MUST also validate
-   the actual resolved destination IP at connection time (for example, by using
-   a custom HTTPX transport/socket hook that verifies the peer IP before
-   connecting, or by pinning the validated IP while preserving the ``Host``
-   header and TLS SNI).
+   Therefore, the website-fetching service (:mod:`app.services.website_extractor`)
+   also validates the resolved destination IP at TCP connection time via
+   ``PinnedSSRFSafeBackend`` (pinning the validated IP while preserving the
+   HTTP ``Host`` header and TLS SNI).
 
 2. **Redirect Security Strategy**:
-   The future HTTPX website-fetching service MUST NOT enable blind automatic
-   redirects (i.e., always configure ``httpx.AsyncClient(follow_redirects=False)``).
-   Instead, it should manually inspect 3xx responses up to ``MAX_REDIRECTS`` hops
-   and pass each ``Location`` header through :func:`validate_redirect_url` before
-   issuing the next request. This ensures a public URL cannot redirect the
-   fetcher to ``localhost``, private networks, cloud metadata endpoints, or
-   unsupported schemes.
+   The HTTPX website-fetching service disables automatic redirects
+   (``httpx.AsyncClient(follow_redirects=False)``), manually inspects 3xx
+   responses up to ``MAX_REDIRECTS`` hops, and passes each ``Location`` header
+   through :func:`validate_redirect_url` before issuing the next request. This
+   ensures a public URL cannot redirect the fetcher to ``localhost``, private
+   networks, cloud metadata endpoints, or unsupported schemes.
 """
 
 from __future__ import annotations
@@ -458,3 +456,20 @@ def validate_redirect_url(current_url: str, location: str) -> str:
 
     target_url = urljoin(current_url, raw_location)
     return validate_url(target_url)
+
+
+def sanitize_url_for_log(url: str, *, include_path: bool = False) -> str:
+    """Return a safe URL representation for logs (omitting credentials, query, and fragment)."""
+    try:
+        parsed = urlsplit(url)
+        host = parsed.hostname or ""
+        if not parsed.scheme or not host:
+            return "<redacted-url>"
+        if ":" in host:
+            host = f"[{host}]"
+        netloc = f"{host}:{parsed.port}" if parsed.port else host
+        if include_path:
+            return urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))
+        return f"{parsed.scheme}://{netloc}"
+    except ValueError:
+        return "<redacted-url>"

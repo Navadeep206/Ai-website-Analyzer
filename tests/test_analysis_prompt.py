@@ -7,7 +7,7 @@ from app.prompts.analysis_prompt import (
     DATA_START_DELIMITER,
     build_analysis_prompt,
 )
-from app.schemas import ExtractedImage, ExtractedLink, WebsiteExtractedData
+from app.schemas import ExtractedLink, WebsiteExtractedData
 
 
 def _sample_website_data(**overrides) -> WebsiteExtractedData:
@@ -46,12 +46,6 @@ def _sample_website_data(**overrides) -> WebsiteExtractedData:
             )
         ],
         "image_alt_texts": ["Real-time SaaS analytics dashboard"],
-        "images": [
-            ExtractedImage(
-                alt="Real-time SaaS analytics dashboard",
-                url="https://cdn.acme.example/should-not-appear-in-prompt.png",
-            )
-        ],
         "content_length": 117,
     }
     defaults.update(overrides)

@@ -35,7 +35,6 @@ from app.services.llm_service import (
     LLMRefusalError,
     LLMSchemaValidationError,
     LLMTimeoutError,
-    analyze_website,
 )
 
 
@@ -396,14 +395,14 @@ class TestGeminiLLMServiceSuccess:
         mock_builder.assert_called_once_with(website_data)
         assert mock_generate.await_args.kwargs["contents"] == "BUILT_PROMPT_CONTENT"
 
-    def test_module_level_analyze_website_supports_injected_service(self):
+    def test_injected_client_is_not_closed_by_service(self):
         mock_generate = AsyncMock(
             return_value=_make_mock_response(text=json.dumps(_valid_llm_payload_dict()))
         )
         client = _make_mock_client(mock_generate)
         service = GeminiLLMService(api_key="dummy-test-key", client=client)
 
-        result = _run(analyze_website(_sample_website_data(), service=service))
+        result = _run(service.analyze_website(_sample_website_data()))
         assert isinstance(result, LLMAnalysisPayload)
         # Injected client must NOT be closed by the service
         client.aio.aclose.assert_not_awaited()

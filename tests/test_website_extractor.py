@@ -658,15 +658,12 @@ class TestHTMLExtractionAndCleaning:
         )
         assert "https://acme.example/empty-text" not in all_urls
 
-        # Images extracted without downloading
+        # Image alt texts extracted without downloading image bytes
         assert extracted.image_alt_texts == [
             "Real-time SaaS analytics dashboard",
             "Analytics engineering team",
             "Inline chart preview",
         ]
-        assert extracted.images[0].url == "https://acme.example/assets/dashboard.png"
-        assert extracted.images[1].url == "https://cdn.example.com/team.jpg"
-        assert extracted.images[2].url is None  # data: URI excluded
 
     def test_missing_title_and_meta_return_none(self):
         extracted = parse_html(
