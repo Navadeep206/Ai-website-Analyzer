@@ -33,3 +33,39 @@ class LinkAnalysisRequest(BaseModel):
     def validate_website_url(cls, value: str) -> str:
         """Validate, SSRF-check, and normalize the submitted website URL."""
         return validate_url(value)
+
+
+class ExtractedLink(BaseModel):
+    """A single relevant hyperlink extracted from a webpage."""
+
+    text: str
+    url: str
+    is_internal: bool
+
+
+class ExtractedImage(BaseModel):
+    """Extracted metadata for a webpage image without downloading image bytes."""
+
+    alt: str
+    url: str | None = None
+
+
+class WebsiteExtractedData(BaseModel):
+    """Structured website content extracted for downstream analysis."""
+
+    requested_url: str
+    final_url: str
+    status_code: int
+    content_type: str
+    title: str | None = None
+    meta_description: str | None = None
+    meta_keywords: list[str] = Field(default_factory=list)
+    h1_headings: list[str] = Field(default_factory=list)
+    h2_headings: list[str] = Field(default_factory=list)
+    h3_headings: list[str] = Field(default_factory=list)
+    main_text: str = ""
+    internal_links: list[ExtractedLink] = Field(default_factory=list)
+    external_links: list[ExtractedLink] = Field(default_factory=list)
+    image_alt_texts: list[str] = Field(default_factory=list)
+    images: list[ExtractedImage] = Field(default_factory=list)
+    content_length: int = 0

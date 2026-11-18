@@ -43,6 +43,8 @@ class Settings(BaseModel):
 
     request_timeout: int = _get_int_env("REQUEST_TIMEOUT", 15)
     max_content_length: int = _get_int_env("MAX_CONTENT_LENGTH", 15000)
+    max_response_bytes: int = _get_int_env("MAX_RESPONSE_BYTES", 2_097_152)
+    user_agent: str = _get_str_env("USER_AGENT", "AIWebsiteLinkAnalysisBot/1.0")
 
     llm_provider: str = _get_str_env("LLM_PROVIDER", "gemini")
     llm_model: str = os.getenv("LLM_MODEL", "").strip()
