@@ -169,8 +169,12 @@ def validate_ip_address(ip: IPAddress) -> None:
 def _try_parse_ip(hostname: str) -> IPAddress | None:
     """Return a parsed IPAddress if hostname is an IP literal, else None."""
     if "%" in hostname:
+        if ":" in hostname:
+            raise URLValidationError(
+                "IPv6 addresses with zone identifiers are not allowed."
+            )
         raise URLValidationError(
-            "IPv6 addresses with zone identifiers are not allowed."
+            "Percent-encoded characters are not allowed in hostnames."
         )
     try:
         return ipaddress.ip_address(hostname)

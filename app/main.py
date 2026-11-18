@@ -247,6 +247,27 @@ async def request_validation_exception_handler(
     )
 
 
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(
+    request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """Catch unhandled exceptions (including dependency errors) safely."""
+    http_status, error_code, safe_message = _map_exception_to_http_error(exc)
+    logger.error(
+        "Unhandled exception path=%s status=%d code=%s error_category=%s",
+        request.url.path,
+        http_status,
+        error_code,
+        type(exc).__name__,
+    )
+    return _build_error_response(
+        status_code=http_status,
+        code=error_code,
+        message=safe_message,
+    )
+
+
 # ---------------------------------------------------------------------------
 # FastAPI Dependency Providers
 # ---------------------------------------------------------------------------

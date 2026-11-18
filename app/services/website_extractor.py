@@ -116,6 +116,10 @@ _WHITESPACE_RE = re.compile(r"[ \t\r\f\v\u00a0\u200b]+")
 _PUNCTUATION_ONLY_RE = re.compile(r"^[\W_]+$")
 _REPEATED_PUNCT_RE = re.compile(r"([!?.|•·\-_=~*])\1{3,}")
 _CHARSET_RE = re.compile(r"charset\s*=\s*['\"]?([a-zA-Z0-9._-]+)", re.IGNORECASE)
+_HIDDEN_STYLE_RE = re.compile(
+    r"(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)\b",
+    re.IGNORECASE,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -161,17 +165,14 @@ class UnsafeRedirectError(WebsiteExtractionError):
 
 
 def _sanitize_url_for_log(url: str) -> str:
-    """Return a safe URL representation for logs (no credentials, bounded query)."""
+    """Return a safe URL representation for logs (no credentials, query, or fragment)."""
     try:
         parsed = urlsplit(url)
         host = parsed.hostname or ""
         if ":" in host:
             host = f"[{host}]"
         netloc = f"{host}:{parsed.port}" if parsed.port else host
-        query = parsed.query
-        if len(query) > 80:
-            query = f"{query[:77]}..."
-        return urlunsplit((parsed.scheme, netloc, parsed.path, query, ""))
+        return urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))
     except ValueError:
         return "<invalid-url>"
 
@@ -331,6 +332,11 @@ def _raise_for_http_status(status_code: int, safe_url: str) -> None:
         "Website fetch failed with HTTP status=%d url=%s", status_code, safe_url
     )
 
+    if status_code == 401:
+        raise WebsiteAccessDeniedError(
+            "Authentication is required to access the target website (HTTP 401).",
+            status_code=401,
+        )
     if status_code == 403:
         raise WebsiteAccessDeniedError(
             "Access to the target website was denied (HTTP 403).",
@@ -646,6 +652,16 @@ def clean_text(raw_text: str, *, max_length: int | None = None) -> str:
     return result
 
 
+def _is_hidden_element(tag: Tag) -> bool:
+    """Return True if an HTML element is explicitly hidden via attribute or inline CSS."""
+    if tag.has_attr("hidden"):
+        return True
+    style = tag.get("style")
+    if isinstance(style, str) and _HIDDEN_STYLE_RE.search(style):
+        return True
+    return False
+
+
 def _is_navigation_only_header(header_tag: Tag) -> bool:
     """Heuristic to decide whether a ``<header>`` is purely navigation chrome.
 
@@ -889,9 +905,13 @@ def parse_html(
         if _is_irrelevant_aside(aside_tag):
             aside_tag.decompose()
 
-    # Prune remaining non-content elements for clean main text and headings
+    # Prune remaining non-content elements and explicitly hidden DOM nodes
     for tag in soup.find_all(list(ALWAYS_REMOVE_TAGS)):
         tag.decompose()
+
+    for tag in list(soup.find_all(True)):
+        if tag.attrs is not None and _is_hidden_element(tag):
+            tag.decompose()
 
     h1_headings = _extract_headings(soup, "h1")
     h2_headings = _extract_headings(soup, "h2")
