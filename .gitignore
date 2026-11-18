@@ -1,0 +1,42 @@
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment variables (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Pytest and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE-specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS-specific files
+.DS_Store
+._*
+Thumbs.db
+
+# Temporary and log files
+*.tmp
+*.temp
+*.log
+
